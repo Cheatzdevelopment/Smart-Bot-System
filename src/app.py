@@ -42,6 +42,8 @@ import html
 import sqlite3
 import datetime
 import logging
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
 
@@ -1608,6 +1610,39 @@ async def text_shortcut(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     return None
 
 
+
+# ============================================================
+# Render Free Web Service Health Server
+# ============================================================
+PORT = int(os.getenv("PORT", "10000"))
+
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(f"{BOT_NAME} is running ✅".encode("utf-8"))
+
+    def log_message(self, format, *args):
+        return
+
+
+def start_health_server() -> None:
+    """Keep Render Web Service alive by binding to a port."""
+    try:
+        server = HTTPServer(("0.0.0.0", PORT), HealthHandler)
+        logger.info("Health server started on port %s", PORT)
+        server.serve_forever()
+    except Exception as e:
+        logger.warning("Health server error: %s", e)
+
+
+def start_health_thread() -> None:
+    thread = threading.Thread(target=start_health_server, daemon=True)
+    thread.start()
+
+
 def validate_env() -> None:
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("❌ សូមដាក់ TELEGRAM_BOT_TOKEN ក្នុង file .env")
@@ -1676,6 +1711,7 @@ def main() -> None:
   PDF      : {'ON' if REPORTLAB_AVAILABLE else 'OFF - install reportlab'}
 ╚══════════════════════════════════════════════╝
 """)
+    start_health_thread()
     app.run_polling(drop_pending_updates=True)
 
 
